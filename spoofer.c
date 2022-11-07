@@ -19,10 +19,13 @@ void print_dhcp_rcv_packet();
 void print_dhcp_send_packet();
 
 const uint8_t dhcp_magic_cookie[4] = {0X63, 0X82, 0X53, 0X63};
-const char* dhcp_message_types[19] = {"", "DHCPDISCOVER", "DHCPOFFER", "DHCPREQUEST", "DHCPDECLINE", "DHCPACK",
+const char* dhcp_message_types[19] = {"", DHCP_DISCOVER_NAME, "DHCPOFFER", DHCP_REQUEST_NAME, "DHCPDECLINE", "DHCPACK",
 "DHCPNAK", "DHCPRELEASE", "DHCPINFORM", "DHCPFORCERENEW", "DHCPLEASEQUERY", "DHCPLEASEUNASSIGNED", 
 "DHCPLEASEUNKNOWN", "DHCPLEASEACTIVE", "DHCPBULKLEASEQUERY", "DHCPLEASEQUERYDONE", 
 "DHCPACTIVELEASEQUERY", "DHCPLEASEQUERYSTATUS", "DHCPTLS"};
+
+const char* FAKE_DNS_1 = "8.8.8.8";
+const char* FAKE_DNS_2 = "8.8.4.4";
 
 int sockfd, numbytes;
 struct ifreq ifopts, if_idx, if_mac, if_ip;
@@ -141,8 +144,8 @@ void build_offer_packet()
 	send_dhcp->options[40] = 6;
 	send_dhcp->options[41] = 8;
 	// DNS Addresses	
-    inet_aton("8.8.8.8", &send_dhcp->options[42]);
-    inet_aton("8.8.4.4", &send_dhcp->options[46]);
+    inet_aton(FAKE_DNS_1, &send_dhcp->options[42]);
+    inet_aton(FAKE_DNS_2, &send_dhcp->options[46]);
 
     // Define DHCP renewal time
     // 1800 seconds, 30 minutes
@@ -224,7 +227,7 @@ void build_ack_packet()
     // Define DHCP message type
     send_dhcp->options[4] = 53;   
 	send_dhcp->options[5] = 1;      
-	send_dhcp->options[6] = 5;      // MESSAGE TYPE 2: OFFER
+	send_dhcp->options[6] = 5;      // MESSAGE TYPE 5 = ACK
 
     // Define Subnet Mask
     send_dhcp->options[7] = 1;      
@@ -247,7 +250,7 @@ void build_ack_packet()
     // Define IP TTL
 	send_dhcp->options[25] = 23;
 	send_dhcp->options[26] = 1;
-	send_dhcp->options[27] = 0X40;
+	send_dhcp->options[27] = 64;
 
     // Define IP address lease time
     // 3600 seconds, 60 minutes
@@ -265,8 +268,8 @@ void build_ack_packet()
 	send_dhcp->options[40] = 6;
 	send_dhcp->options[41] = 8;
 	//DNS Addresses	
-    inet_aton("8.8.8.8", &send_dhcp->options[42]);
-    inet_aton("8.8.4.4", &send_dhcp->options[46]);
+    inet_aton(FAKE_DNS_1, send_dhcp->options[42]);
+    inet_aton(FAKE_DNS_2, &send_dhcp->options[46]);
 
     // Define DHCP renewal time
     // 1800 seconds, 30 minutes
@@ -279,7 +282,7 @@ void build_ack_packet()
 
     // Define DHCP rebinding time
     // 3150 seconds, 52.5 minutes
-	send_dhcp->options[56] = 0X3b;
+	send_dhcp->options[56] = 59;
 	send_dhcp->options[57] = 4;
 	send_dhcp->options[58] = 0;
 	send_dhcp->options[59] = 0;
@@ -335,32 +338,32 @@ int main(int argc, char *argv[])
                 print_dhcp_rcv_packet();
 
 				// Answer to DHCPDISCOVER packets
-				// if (rcv_dhcp->options[6] == 1){
+				if (DHCP_DISCOVER_NAME == dhcp_message_types[rcv_dhcp->options[6]]){
 					
-                //     printf("Sending DHCPOFFER packet\n");
-				// 	build_offer_packet();
-                //     print_dhcp_send_packet();
+                    printf("Sending DHCPOFFER packet\n");
+					build_offer_packet();
+                    print_dhcp_send_packet();
 
-				// 	memcpy(socket_address.sll_addr, mac_dest, 6);
-				// 	if (sendto(sockfd, (char *) send_buffer, sizeof(send_buffer), 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0)
-				// 	    printf("Error sending packet through socket. The reported error is %s\n", strerror(errno));
-				// 	else 
-				// 	    printf("DHCPOFFER sent\n\n");
-				// }
+					memcpy(socket_address.sll_addr, mac_dest, 6);
+					if (sendto(sockfd, (char *) send_buffer, sizeof(send_buffer), 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0)
+					    printf("Error sending packet through socket. The reported error is %s\n", strerror(errno));
+					else 
+					    printf("DHCPOFFER sent\n\n");
+				}
 
-				// // Answer to DHCPREQUEST packets
-				// if (rcv_dhcp->options[6] == 3){
+				// Answer to DHCPREQUEST packets
+				if (rcv_dhcp->options[6] == 3){
 					
-                //     printf("Sending DHCPACK packet\n");
-				// 	build_ack_packet();
-                //     print_dhcp_send_packet();
+                    printf("Sending DHCPACK packet\n");
+					build_ack_packet();
+                    print_dhcp_send_packet();
 
-				// 	memcpy(socket_address.sll_addr, mac_dest, 6);
-				// 	if (sendto(sockfd, (char *) send_buffer, sizeof(send_buffer), 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0)
-				// 	    printf("Error sending packet through socket. The reported error is %s\n", strerror(errno));
-				// 	else 
-				// 	    printf("DHCPACK packet sent\n\n");
-				// }
+					memcpy(socket_address.sll_addr, mac_dest, 6);
+					if (sendto(sockfd, (char *) send_buffer, sizeof(send_buffer), 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0)
+					    printf("Error sending packet through socket. The reported error is %s\n", strerror(errno));
+					else 
+					    printf("DHCPACK packet sent\n\n");
+				}
 
 			}
 			
@@ -408,7 +411,7 @@ void get_interface_mac()
 
 void print_dhcp_rcv_packet()
 {
-    printf("DHCP Receive Packet:\n");
+    printf("Received DHCP Packet:\n");
     printf("Op Code: %d\n", rcv_dhcp->op_code);
     printf("Hardware Type: %d\n", rcv_dhcp->htype);
     printf("Hardware Length: %d\n", rcv_dhcp->hlen);
@@ -434,8 +437,6 @@ void print_dhcp_rcv_packet()
 
 void print_dhcp_send_packet()
 {
-
-    printf("DHCP Send Packet:\n");
     printf("Op Code: %d\n", send_dhcp->op_code);
     printf("Hardware Type: %d\n", send_dhcp->htype);
     printf("Hardware Length: %d\n", send_dhcp->hlen);
@@ -448,6 +449,8 @@ void print_dhcp_send_packet()
     printf("Server ip: %d.%d.%d.%d\n", send_dhcp->siaddr[0], send_dhcp->siaddr[1], send_dhcp->siaddr[2], send_dhcp->siaddr[3]);
     printf("Gateway ip: %d.%d.%d.%d\n", send_dhcp->giaddr[0], send_dhcp->giaddr[1], send_dhcp->giaddr[2], send_dhcp->giaddr[3]);
     printf("IP Packet Source: %d.%d.%d.%d\n", raw_send->ip.src[0], raw_send->ip.src[1], raw_send->ip.src[2], raw_send->ip.src[3]);
-    printf("IP Packet Dest: %d.%d.%d.%d\n\n", raw_send->ip.dst[0], raw_send->ip.dst[1], raw_send->ip.dst[2], raw_send->ip.dst[3]);
+    printf("IP Packet Dest: %d.%d.%d.%d\n", raw_send->ip.dst[0], raw_send->ip.dst[1], raw_send->ip.dst[2], raw_send->ip.dst[3]);
+	printf("DNS 1: %d.%d.%d.%d\n", send_dhcp->options[42], send_dhcp->options[43], send_dhcp->options[44], send_dhcp->options[45]);
+	printf("DNS 2: %d.%d.%d.%d\n\n", send_dhcp->options[46], send_dhcp->options[47], send_dhcp->options[48], send_dhcp->options[49]);
 
 }

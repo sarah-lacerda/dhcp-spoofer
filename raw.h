@@ -2,10 +2,12 @@
 #define ETHER_TYPE	0x0808
 #define DEFAULT_IF	"eth0"
 #define IP_BROADCAST "255.255.255.255"
-#define IP_DEST_PLACEHOLDER "192.168.0.123"
+#define IP_DEST_PLACEHOLDER "192.168.1.123"
 #define PROTO_UDP	17
 #define DHCP_PORT	67
 #define DHCP_PORT_2	68
+#define DHCP_DISCOVER_NAME "DHCPDISCOVER"
+#define DHCP_REQUEST_NAME "DHCPREQUEST"
 
 struct eth_hdr_s {
 	uint8_t dst_addr[6];
