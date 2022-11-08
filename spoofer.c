@@ -268,7 +268,7 @@ void build_ack_packet()
 	send_dhcp->options[40] = 6;
 	send_dhcp->options[41] = 8;
 	//DNS Addresses	
-    inet_aton(FAKE_DNS_1, send_dhcp->options[42]);
+    inet_aton(FAKE_DNS_1, &send_dhcp->options[42]);
     inet_aton(FAKE_DNS_2, &send_dhcp->options[46]);
 
     // Define DHCP renewal time
