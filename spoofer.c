@@ -382,7 +382,7 @@ int main(int argc, char *argv[])
 				}
 
 				// Answer to DHCPREQUEST packets
-				if (rcv_dhcp->options[6] == 3){
+				if (DHCP_REQUEST_NAME == dhcp_message_types[rcv_dhcp->options[6]]){
 					
                     printf("Sending DHCPACK packet\n");
 					build_ack_packet();
