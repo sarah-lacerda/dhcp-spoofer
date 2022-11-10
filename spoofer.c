@@ -33,6 +33,7 @@ struct ifreq ifopts, if_idx, if_mac, if_ip;
 struct sockaddr_ll socket_address;
 
 char* interface_ip;
+char* client_ip;
 uint8_t interface_mac[6]; 
 uint8_t mac_dest[6];
 char interface_name[IFNAMSIZ];
@@ -121,6 +122,7 @@ void build_offer_packet()
     send_dhcp->flags = htons(0x0000);
 	inet_aton("0.0.0.0", &send_dhcp->ciaddr);
 	inet_aton(IP_DEST_PLACEHOLDER, &send_dhcp->yiaddr);
+//	inet_aton(client_ip, &send_dhcp->yiaddr);
 	inet_aton(interface_ip, &send_dhcp->siaddr);
     inet_aton("0.0.0.0", &send_dhcp->giaddr);
     memcpy(send_dhcp->chaddr, mac_dest, 6);
@@ -246,6 +248,7 @@ void build_ack_packet()
     send_dhcp->sec = 0;
     send_dhcp->flags = htons(0x0000);
 	inet_aton("0.0.0.0", &send_dhcp->ciaddr);
+//	inet_aton(client_ip, &send_dhcp->yiaddr);
 	inet_aton(IP_DEST_PLACEHOLDER, &send_dhcp->yiaddr);
 	inet_aton(interface_ip, &send_dhcp->siaddr);
     inet_aton("0.0.0.0", &send_dhcp->giaddr);
@@ -327,6 +330,28 @@ void build_ack_packet()
 
 }
 
+void get_client_ip() {
+	char* interface_ip_byte;
+	char* interface_ip_copy = malloc(sizeof(interface_ip_copy));
+	memcpy(&interface_ip_copy, interface_ip, 6);
+
+	printf("interface_ip_copy=%s\n", interface_ip_copy);
+	
+	client_ip = malloc(sizeof(interface_ip_copy));
+	interface_ip_byte = strtok(interface_ip_copy, ".");
+	sprintf(client_ip + strlen(client_ip),"%s.", interface_ip_byte);
+	interface_ip_byte = strtok(NULL, ".");
+	sprintf(client_ip + strlen(client_ip),"%s.", interface_ip_byte);
+	interface_ip_byte = strtok(NULL, ".");
+	sprintf(client_ip + strlen(client_ip),"%s.", interface_ip_byte);
+	interface_ip_byte = strtok(NULL, ".");
+	srand(time(NULL));
+	sprintf(client_ip + strlen(client_ip),"%d", 100 + rand() % 99);
+
+	printf("%s\n", client_ip);
+}
+
+
 int main(int argc, char *argv[])
 {
 	
@@ -373,6 +398,7 @@ int main(int argc, char *argv[])
 				if (DHCP_DISCOVER_NAME == dhcp_message_types[rcv_dhcp->options[6]]){
 					
                     printf("Sending DHCPOFFER packet\n");
+//					get_client_ip();
 					build_offer_packet();
                     print_dhcp_send_packet();
 
